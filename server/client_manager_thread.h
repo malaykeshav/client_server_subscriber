@@ -44,6 +44,10 @@ class ClientManagerThread : public std::thread {
   // actively being listened to.
   void AddWaitingClients();
 
+  // Returns the current list of received news items, and resets the existing
+  // list to empty.
+  std::vector<common::NewsItem> GetAndResetReceivedItems();
+
   // A delegate to send back processed messages to the server.
   ServerSubscriberDelegate* delegate_ = nullptr;
 

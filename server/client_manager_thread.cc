@@ -72,7 +72,7 @@ void ClientManagerThread::RunLoop() {
         std::chrono::duration_cast<std::chrono::milliseconds>(current - begin)
             .count();
     if (interval > kPushItemThresholdMilliSec) {
-        delegate_->PushItemsToSubscribers(received_items_);
+        delegate_->PushItemsToSubscribers(GetAndResetReceivedItems());
         received_items_.clear();
         begin = current;
     }
@@ -162,5 +162,11 @@ void ClientManagerThread::AddWaitingClients() {
     std::cout << "Reader thread is listening to new client: " << client.socket
               << std::endl;
   }
+}
+
+std::vector<common::NewsItem> ClientManagerThread::GetAndResetReceivedItems() {
+    std::vector<common::NewsItem> ret;
+    received_items_.swap(ret);
+    return ret;
 }
 }  // namespace server
