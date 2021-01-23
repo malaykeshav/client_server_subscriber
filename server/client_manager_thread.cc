@@ -73,7 +73,6 @@ void ClientManagerThread::RunLoop() {
             .count();
     if (interval > kPushItemThresholdMilliSec) {
         delegate_->PushItemsToSubscribers(GetAndResetReceivedItems());
-        received_items_.clear();
         begin = current;
     }
 
