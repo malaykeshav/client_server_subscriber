@@ -2,14 +2,39 @@
 
 #include <arpa/inet.h>
 #include <iostream>
+#include <memory>
+#include <mutex>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/socket.h>
+#include <thread>
 #include <unistd.h> 
-#include <stdio.h> 
-#include <sys/socket.h> 
-#include <stdlib.h> 
 
 namespace {
 constexpr int kListenPendingQueue = 3;
+constexpr int kReadTimeOutSec = 1;
+constexpr int kBufferSize = 1024;
+
+void InsertClient(std::vector<ClientProxy>& clients,
+                  const ClientProxy& client) {
+    for (ClientProxy& c : clients) {
+        if (c.IsConnected())
+            continue;
+        c.socket = client.socket;
+        c.address = client.address;
+        return;
+    }
+    clients.push_back(client);
+}
 } // namespace
+
+Server::Server() {
+}
+
+Server::~Server() {
+    listening_ = false;
+    reader_thread_->join();
+}
 
 bool Server::OpenSocket(int port) {
     int opt = 1; 
@@ -44,6 +69,8 @@ bool Server::OpenSocket(int port) {
 }
 
 void Server::StartListening() {
+    InitializeReaderThread();
+
     fd_set fdset;
     FD_ZERO(&fdset);
     FD_SET(socket_, &fdset);
@@ -54,7 +81,7 @@ void Server::StartListening() {
        
         if (activity < 0) {   
             std::cerr << "Select Error" << std::endl;   
-            return;
+            break;
         }   
              
         //If its not the server socket, then ignore.
@@ -80,11 +107,94 @@ void Server::StartListening() {
 
         HandleNewClient(client);
     }
+    listening_ = false;
+    TerminateReaderThread();
+}
+
+void Server::TerminateReaderThread() {
+    reader_thread_->join();
+    reader_thread_.reset(nullptr);
 }
 
 void Server::HandleNewClient(ClientProxy client) {
-    clients_.push_back(client);
+    {
+        std::unique_lock<std::mutex> lck (clients_mtx_);
+        clients_wait_queue_.push(client);
+    }
     
     std::string hello = "Server: Connected to server";
     send(client.socket, hello.c_str(), hello.size(), 0); 
+}
+
+void Server::InitializeReaderThread() {
+    // Initialize a thread that will read responses from clients.
+    listening_ = true;
+    reader_thread_ = 
+        std::make_unique<std::thread>(&Server::ReadFromClientLoop, this);
+}
+
+void Server::ReadFromClientLoop() {
+    std::cout << "Thread is beginning to read in loop" << std::endl;
+    fd_set fd_read_set;
+    FD_ZERO(&fd_read_set);
+    
+    struct timeval timeout;        
+    timeout.tv_sec = kReadTimeOutSec;             
+    timeout.tv_usec = 0;
+
+    char buffer[kBufferSize] = {0};
+
+    while(listening_) {
+        int max_socket = 0;
+        {
+            // Check if any new client has connected since last iteration.
+            std::unique_lock<std::mutex> lck (clients_mtx_);
+            while(clients_wait_queue_.size()) {
+                const ClientProxy client = clients_wait_queue_.front();
+                clients_wait_queue_.pop();
+                if (!client.IsConnected()) 
+                    continue;
+                InsertClient(clients_, client);
+                std::cout << "Reader thread is listening to new client: "
+                          << client.socket << std::endl;
+            }
+
+            FD_ZERO(&fd_read_set);
+            for (const auto& client : clients_) {
+                if (!client.IsConnected())
+                    continue;
+                FD_SET(client.socket, &fd_read_set); 
+                max_socket = std::max(max_socket, client.socket);
+            }
+        }
+        int activity = 
+            select(max_socket + 1, &fd_read_set, nullptr, nullptr, &timeout);
+        if (activity < 0)
+            continue;
+        
+        for (auto& client : clients_) {
+            if (client.IsConnected()) {
+                if (!FD_ISSET(client.socket, &fd_read_set))
+                    continue;
+                int len = read(client.socket, buffer, kBufferSize);
+                if (len <= 0) {
+                    HandleClientDisconnect(client);
+                } else {
+                    std::string message(buffer, len);
+                    std::cout << "Message from client: " << message << std::endl;
+                }
+            }
+        }
+    }
+
+    std::cout << "Thread has finished reading" << std::endl;
+}
+
+void Server::HandleClientDisconnect(ClientProxy& client) {
+    std::cout << "Client Disconnectied: " << client.socket 
+              << " with IP: " << inet_ntoa(client.address.sin_addr)
+              << " and port: " << ntohs(client.address.sin_port) 
+              << std::endl;
+    close(client.socket);
+    client.socket = 0;
 }

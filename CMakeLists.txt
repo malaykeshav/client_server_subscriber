@@ -1,8 +1,9 @@
 cmake_minimum_required(VERSION 3.0.0)
 project(ClientServerSubscriber VERSION 0.1.0)
 
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-std=c++14")
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-std=c++14 -pthread")
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
@@ -23,3 +24,5 @@ add_executable(Sample_Server
 add_executable(Sample_Client
         sample_client.cc
         src/client.cc)
+
+target_link_libraries (Sample_Server ${CMAKE_THREAD_LIBS_INIT})
