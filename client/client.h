@@ -1,7 +1,7 @@
 #ifndef CLIENT_CLIENT_H_
 #define CLIENT_CLIENT_H_
 
-#include "file_reader.h"
+#include "../common/file_reader.h"
 
 #include <netinet/in.h>
 #include <string>
@@ -39,7 +39,7 @@ class Client {
   std::string ip_address_;
   char buffer_[1024];
   bool should_disconnect_ = false;
-  FileReader file_reader_;
+  common::FileReader file_reader_;
 };
 
 }  // namespace client

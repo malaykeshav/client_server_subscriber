@@ -13,6 +13,11 @@ struct NewsItem {
   std::string ToString() const;
   static bool FromString(const std::string& string, NewsItem& item);
 
+  struct OrderByPriority {
+      bool operator()(const NewsItem& a, const NewsItem& b) {
+          return a.priority < b.priority;
+      }
+  };
 };
 
 }  // namespace common

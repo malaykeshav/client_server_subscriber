@@ -46,7 +46,10 @@ void AddWaitingClients(std::queue<ClientProxy>& client_wait_queue,
 }
 }  // namespace
 
-Server::Server() {}
+Server::Server(const std::string& config_file_name)
+    : config_file_reader_(config_file_name) {
+  InitializeSubscriberConfig();
+}
 
 Server::~Server() {
   listening_ = false;
@@ -125,6 +128,20 @@ void Server::StartListening() {
   TerminateReaderThread();
 }
 
+void Server::InitializeSubscriberConfig() {
+  common::SubscriberItem item;
+
+  while (config_file_reader_.GetNextLineAsSubscriberItem(item)) {
+    auto it = subscribers_.find(item.subscriber_id);
+    if (it == subscribers_.end()) {
+      subscribers_.insert({item.subscriber_id,
+          std::make_unique<Subscriber>(item.subscriber_id)});
+    }
+    auto& subscriber = subscribers_.at(item.subscriber_id);
+    subscriber->AddInterest(item.category);
+  }
+}
+
 void Server::TerminateReaderThread() {
   reader_thread_->join();
   reader_thread_.reset(nullptr);
@@ -179,7 +196,7 @@ void Server::ReadFromClientLoop() {
     }
     int activity =
         select(max_socket + 1, &fd_read_set, nullptr, nullptr, &timeout);
-    
+
     // In case of a timeout, no message needs to be read.
     if (activity < 0) continue;
 
@@ -204,7 +221,6 @@ void Server::ReadFromClientLoop() {
       }
     }
   }
-
   std::cout << "Thread has finished reading" << std::endl;
 }
 

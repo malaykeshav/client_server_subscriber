@@ -7,14 +7,17 @@
 #include <mutex>
 #include <queue>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
+#include "../common/file_reader.h"
 #include "client_proxy.h"
+#include "subscriber.h"
 
 namespace server {
 class Server {
  public:
-  Server();
+  Server(const std::string& config_file_name);
   ~Server();
 
   // Opens a socket to listen on. Returns true on success.
@@ -30,13 +33,29 @@ class Server {
   Server& operator=(Server&&) = delete;
 
  private:
-  void HandleNewClient(ClientProxy client);
+  // Reads the server config file to initialize the hash map of subscriber.
+  void InitializeSubscriberConfig();
 
+  // Initializes the thread that is responsible for reading the incoming
+  // messages from the client.
   void InitializeReaderThread();
   void TerminateReaderThread();
+
+  // An infinite loop that listes to client fds for changes. This is run on
+  // a separate thread.
   void ReadFromClientLoop();
+
+  void HandleNewClient(ClientProxy client);
   void HandleClientDisconnect(ClientProxy& client);
+
+  // Sends an ACK to the list of clients in |clients_to_ack|. These clients
+  // have sent a message and are waiting on ACK to send the next one.
   void SendAcksToClient(std::queue<ClientProxy*>& clients_to_ack);
+
+  common::FileReader config_file_reader_;
+
+  typedef unsigned long long SubscriberID;
+  std::unordered_map<SubscriberID, std::unique_ptr<Subscriber>> subscribers_;
 
   int socket_ = 0;
   sockaddr_in address_;
