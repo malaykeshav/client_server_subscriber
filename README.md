@@ -47,17 +47,17 @@ There can only be one instance of server running since the socket port is fixed.
 ## Implementation Overview
 The server manages 3 primary threads.
  1. **Listener Thread** - Thread to listen for new Client connections
- 2. **Client Manager Thread** -  Thread to manage existing Client connections including listening for incoming messages and client disconnect.
- 3. **Publisher Thread** - Thread to manage publishing messages to subscribers.
+ 2. **Client Manager Thread** -  Thread to manage existing Client connections. Processes incoming messages and client disconnects.
+ 3. **Publisher Thread** - Thread to manage publishing(writing to disk) messages for subscribers.
 
-The Listener thread upon receiving a new connection, passes on the management of it to the Client Manager Thread. The Client manager thread listens to changes in the socket of this new connection and existing ones, for incoming message or disconnect. 
-The client manager thread maintains a list of messages received, and periodically pushes them onto the queue of each subscriber.
+The Listener thread upon receiving a new connection, passes on the management of it to the Client Manager Thread. The Client manager thread listens to changes in the socket of this new connection and existing ones, for incoming message or disconnections. 
+The client manager thread maintains a list of messages received, and periodically pushes them onto the queue of each subscriber. It is also responsible for sending back ACKs to clients so they can send the next message.
 
-The Publisher thread periodically flushes the queue on each subscriber onto the disk, thus accomplishing the task of publishing the headlines for each subscriber. 
+The Publisher thread periodically flushes the priority queue in each subscriber object onto the disk, thus accomplishing the task of publishing the headlines for each subscriber. 
 
 In a real world scenario, the Listener thread, instead of pushing the items to each subscriber's queue, could simply make an RPC/REST call to a service that manages the subscriber queue and its publishing. Services like RabbitMQ's priority queue, which stores the information persistently can be used to scale the system and make if fault tolerant.
 
 ## Opportunities for scaling
-1. The Client Manager thread can be have multiple instances such that when a new client connects, the Listener thread can pass it on to the correct Client Manager thread in a Round Robin manner. It can also be smart and see which Client Manager thread is least busy and assign the new client to this least busy thread.
-2. The Publisher thread can be scaled with the help of a thread worker pool. Instead of a single thread managing the publishing of items for each subscriber, a pool of worker threads can each pick up a task of publishing to a subscriber. In this case, publishing being writing to a file on disk. Since each subscriber file is separate, this operation can be horizontally scaled quite easily.
+1. Instead of a single Client Manager thread there can be multiple instances of it, such that when a new client connects, the Listener thread can pass it on to a different Client Manager thread in a Round Robin manner. It can also be smart and see which Client Manager thread is least busy and assign the new client to this least busy thread.
+2. The Publisher thread can be scaled with the help of a thread worker pool. Instead of a single thread managing the publishing of items for each subscriber, a pool of worker threads can each pick up a task of publishing to a subscriber. In this case, publishing is writing to a file on disk. Since each subscriber file is separate, this operation can be horizontally scaled quite easily.
 
