@@ -6,7 +6,7 @@
 #include "client/client.h"
 
 int main(int argc, char *argv[]) {
-    Client client;
+    client::Client client;
     bool result = client.ConnectToServer("127.0.0.1", 9211);
     if (!result)
         return 0;

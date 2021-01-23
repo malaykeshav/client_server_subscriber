@@ -6,7 +6,7 @@
 #include "server/server.h"
 
 int main(int argc, char *argv[]) {
-    Server server;
+    server::Server server;
     bool result = server.OpenSocket(9211);
     if (!result)
         return 0;
