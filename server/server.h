@@ -8,7 +8,7 @@
 #include <thread>
 #include <vector>
 
-#include "../include/client_proxy.h"
+#include "client_proxy.h"
 
 class Server {
   public:

@@ -19,10 +19,10 @@ add_definitions(
 
 add_executable(Sample_Server
         sample_server.cc
-        src/server.cc)
+        server/server.cc)
 
 add_executable(Sample_Client
         sample_client.cc
-        src/client.cc)
+        client/client.cc)
 
 target_link_libraries (Sample_Server ${CMAKE_THREAD_LIBS_INIT})
