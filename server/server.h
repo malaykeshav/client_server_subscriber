@@ -12,10 +12,11 @@
 #include "../common/file_reader.h"
 #include "client_manager_thread.h"
 #include "client_proxy.h"
+#include "server_subscriber_delegate.h"
 #include "subscriber.h"
 
 namespace server {
-class Server {
+class Server : public ServerSubscriberDelegate {
  public:
   Server(const std::string& config_file_name);
   ~Server();
@@ -25,6 +26,10 @@ class Server {
 
   // Starts listening for incoming connection from clients.
   void StartListening();
+
+  // overrides ServerSubscriberDelegate:
+  void PushItemsToSubscribers(
+      const std::vector<common::NewsItem>& items) override;
 
   // Disable copy or move
   Server(const Server&) = delete;

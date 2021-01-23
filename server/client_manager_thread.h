@@ -8,12 +8,15 @@
 #include <vector>
 
 #include "client_proxy.h"
+#include "server_subscriber_delegate.h"
 
 namespace server {
 
+// Manages the lifetime of connection with clients assigned to this class.
+// Server can add new clients for this to manage.
 class ClientManagerThread : public std::thread {
  public:
-  explicit ClientManagerThread();
+  explicit ClientManagerThread(ServerSubscriberDelegate* delegate);
 
   const std::size_t size() const { return size_; }  
 
@@ -41,6 +44,9 @@ class ClientManagerThread : public std::thread {
   // Adds the client in the wait queue to list of clients that are
   // actively being listened to.
   void AddWaitingClients();
+
+  // A delegate to send back processed messages to the server.
+  ServerSubscriberDelegate* delegate_ = nullptr;
 
   // Mutex to modify the wait queue.
   std::mutex clients_mtx_;

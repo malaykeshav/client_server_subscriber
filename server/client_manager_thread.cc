@@ -1,6 +1,7 @@
 #include "client_manager_thread.h"
 
 #include <arpa/inet.h>
+#include <assert.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -14,6 +15,7 @@ namespace server {
 namespace {
 constexpr int kReadTimeOutSec = 1;
 constexpr int kBufferSize = 1024;
+constexpr char kAckMessage[] = "ACK";
 
 void InsertClient(std::vector<ClientProxy>& clients,
                   const ClientProxy& client) {
@@ -27,8 +29,11 @@ void InsertClient(std::vector<ClientProxy>& clients,
 }
 }  // namespace
 
-ClientManagerThread::ClientManagerThread()
-    : std::thread(&ClientManagerThread::RunLoop, this) {}
+ClientManagerThread::ClientManagerThread(ServerSubscriberDelegate* delegate)
+    : std::thread(&ClientManagerThread::RunLoop, this),
+      delegate_(delegate) {
+    assert (delegate_ != nullptr);
+}
 
 void ClientManagerThread::AddClient(const ClientProxy& client) {
   std::unique_lock<std::mutex> lck(clients_mtx_);
@@ -115,7 +120,7 @@ void ClientManagerThread::SendAcksToClient(
   while (clients_to_ack.size()) {
     ClientProxy* client = clients_to_ack.front();
     clients_to_ack.pop();
-    if (client->IsConnected()) send(client->socket, "ACK", 3, 0);
+    if (client->IsConnected()) send(client->socket, kAckMessage, 3, 0);
   }
 }
 
@@ -129,6 +134,10 @@ void ClientManagerThread::AddWaitingClients() {
     clients_wait_queue_.pop();
     if (!client.IsConnected()) continue;
     InsertClient(clients_, client);
+
+    // Inform client that it can now send messages.
+    send(client.socket, kAckMessage, 3, 0);
+
     std::cout << "Reader thread is listening to new client: " << client.socket
               << std::endl;
   }

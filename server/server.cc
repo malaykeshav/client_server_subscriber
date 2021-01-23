@@ -122,12 +122,11 @@ void Server::HandleClientConnect(ClientProxy client) {
   // POSSIBLE OPTIMIZATION
   // This could be made smarter by picking a thread that is least loaded.
   reader_thread_->AddClient(client);
-  send(client.socket, "ACK", 3, 0);
 }
 
 void Server::InitializeReaderThread() {
   // Initialize a thread that will read responses from clients.
-  reader_thread_ = std::make_unique<ClientManagerThread>();
+  reader_thread_ = std::make_unique<ClientManagerThread>(this);
 }
 
 }  // namespace server
