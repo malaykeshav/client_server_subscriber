@@ -25,7 +25,7 @@ cmake --build /path/to/client_server_subscriber/build --target Sample_Client
 #### Server
 To run the server it needs a configuration file and an out folder path to output subscriber files. The config file contains the key-value pair of subscriber and their category of interest:
 ```
-<hex-subscriber_id> : "<string-category"
+<hex-subscriber_id> : "<string-category>"
 ```
 ```
 # Running the server binary
