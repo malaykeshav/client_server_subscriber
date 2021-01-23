@@ -23,9 +23,7 @@ Server::Server(const std::string& config_file_name)
   InitializeSubscriberConfig();
 }
 
-Server::~Server() {
-  TerminateReaderThread();
-}
+Server::~Server() { TerminateReaderThread(); }
 
 bool Server::OpenSocket(int port) {
   int opt = 1;
@@ -96,6 +94,12 @@ void Server::StartListening() {
     HandleClientConnect(client);
   }
   TerminateReaderThread();
+}
+
+void Server::PushItemsToSubscribers(
+    const std::vector<common::NewsItem>& items) {
+    for (auto& it : subscribers_)
+        it.second->PushNewsItems(items);
 }
 
 void Server::InitializeSubscriberConfig() {

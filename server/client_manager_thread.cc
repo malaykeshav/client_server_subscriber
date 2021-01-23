@@ -7,6 +7,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
+#include <chrono>
 #include <iostream>
 
 #include "../common/news_item.h"
@@ -16,6 +17,7 @@ namespace {
 constexpr int kReadTimeOutSec = 1;
 constexpr int kBufferSize = 1024;
 constexpr char kAckMessage[] = "ACK";
+constexpr int64_t kPushItemThresholdMilliSec = 20;
 
 void InsertClient(std::vector<ClientProxy>& clients,
                   const ClientProxy& client) {
@@ -30,9 +32,8 @@ void InsertClient(std::vector<ClientProxy>& clients,
 }  // namespace
 
 ClientManagerThread::ClientManagerThread(ServerSubscriberDelegate* delegate)
-    : std::thread(&ClientManagerThread::RunLoop, this),
-      delegate_(delegate) {
-    assert (delegate_ != nullptr);
+    : std::thread(&ClientManagerThread::RunLoop, this), delegate_(delegate) {
+  assert(delegate_ != nullptr);
 }
 
 void ClientManagerThread::AddClient(const ClientProxy& client) {
@@ -56,7 +57,25 @@ void ClientManagerThread::RunLoop() {
 
   std::queue<ClientProxy*> send_acks_to;
 
+  // After every |kPushItemThresholdMilliSec|, the thread pushes the current
+  // batch of received NewsItem to the subscribers on the server.
+  std::chrono::steady_clock::time_point begin =
+      std::chrono::steady_clock::now();
+  std::chrono::steady_clock::time_point current;
+
   while (should_run_) {
+    // Uncomment this line to cause clients to send messages with a delay.
+    // std::this_thread::sleep_for (std::chrono::milliseconds(300));
+
+    current = std::chrono::steady_clock::now();
+    int64_t interval =
+        std::chrono::duration_cast<std::chrono::milliseconds>(current - begin)
+            .count();
+    if (interval > kPushItemThresholdMilliSec) {
+        delegate_->PushItemsToSubscribers(received_items_);
+        received_items_.clear();
+    }
+
     // Send "ACK" to clients so they send the next message.
     SendAcksToClient(send_acks_to);
     AddWaitingClients();
@@ -111,7 +130,8 @@ bool ClientManagerThread::HandleClientMessage(ClientProxy& client,
     HandleClientDisconnect(client);
     return false;
   }
-  std::cout << "Message received: " << message << std::endl;
+  received_items_.push_back(item);
+
   return true;
 }
 

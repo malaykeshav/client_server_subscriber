@@ -56,6 +56,11 @@ class ClientManagerThread : public std::thread {
   // Sparsely populated: Some entries of clients are disconnected.
   std::vector<ClientProxy> clients_;
 
+  // List of NewsItems received from the clients. Every few time intervals,
+  // this list is pushed to the subscribers in bult. This improves throughput
+  // by reducing the number of times lock needs to be acquired.
+  std::vector<common::NewsItem> received_items_;
+
   // Current number of clients being managed. May change after this is
   // called.
   std::size_t size_ = 0;

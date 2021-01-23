@@ -19,7 +19,7 @@ class Subscriber {
 
   // If the Subscriber is interested in the news item, it stores it in queue,
   // until the next flugh.
-  void PushNewsItem(const common::NewsItem& item);
+  void PushNewsItems(const std::vector<common::NewsItem>& items);
 
   // Flushes the news item in queue to disk.
   void FlushNewsItemQueue();
