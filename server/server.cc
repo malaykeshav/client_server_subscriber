@@ -1,7 +1,5 @@
 #include "server.h"
 
-#include "../common/news_item.h"
-
 #include <arpa/inet.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,6 +11,8 @@
 #include <mutex>
 #include <queue>
 #include <thread>
+
+#include "../common/news_item.h"
 
 namespace server {
 namespace {
@@ -29,6 +29,20 @@ void InsertClient(std::vector<ClientProxy>& clients,
     return;
   }
   clients.push_back(client);
+}
+
+// Adds the client in the wait queue to list of clients that are
+// actively being listened to.
+void AddWaitingClients(std::queue<ClientProxy>& client_wait_queue,
+                       std::vector<ClientProxy>& clients) {
+  while (client_wait_queue.size()) {
+    const ClientProxy client = client_wait_queue.front();
+    client_wait_queue.pop();
+    if (!client.IsConnected()) continue;
+    InsertClient(clients, client);
+    std::cout << "Reader thread is listening to new client: " << client.socket
+              << std::endl;
+  }
 }
 }  // namespace
 
@@ -145,20 +159,18 @@ void Server::ReadFromClientLoop() {
   std::queue<ClientProxy*> send_acks_to;
 
   while (listening_) {
+    // Send "ACK" to clients so they send the next message.
     SendAcksToClient(send_acks_to);
-    int max_socket = 0;
+
     {
-      // Check if any new client has connected since last iteration.
+      // Check if any new client has connected since last iteration and start
+      // listening to them as well.
       std::unique_lock<std::mutex> lck(clients_mtx_);
-      while (clients_wait_queue_.size()) {
-        const ClientProxy client = clients_wait_queue_.front();
-        clients_wait_queue_.pop();
-        if (!client.IsConnected()) continue;
-        InsertClient(clients_, client);
-        std::cout << "Reader thread is listening to new client: "
-                  << client.socket << std::endl;
-      }
+      AddWaitingClients(clients_wait_queue_, clients_);
     }
+
+    // Add clients to the |fd_read_set| so select() can listen to fd changes.
+    int max_socket = 0;
     FD_ZERO(&fd_read_set);
     for (const auto& client : clients_) {
       if (!client.IsConnected()) continue;
@@ -167,26 +179,28 @@ void Server::ReadFromClientLoop() {
     }
     int activity =
         select(max_socket + 1, &fd_read_set, nullptr, nullptr, &timeout);
+    
+    // In case of a timeout, no message needs to be read.
     if (activity < 0) continue;
 
+    // For each client, check if their fd is what trigerred select().
     for (auto& client : clients_) {
-      if (client.IsConnected()) {
-        if (!FD_ISSET(client.socket, &fd_read_set)) continue;
-        int len = read(client.socket, buffer, kBufferSize);
-        if (len <= 0) {
-          HandleClientDisconnect(client);
-        } else {
-          std::string message(buffer, len);
-        
-          // If the message received cannot be marshaled into a valid news item
-          // terminate connection with client.
-          common::NewsItem item;
-          if (!common::NewsItem::FromString(message, item))
-            HandleClientDisconnect(client);
-          else 
-              send_acks_to.push(&client);
+      if (!client.IsConnected()) continue;
+      if (!FD_ISSET(client.socket, &fd_read_set)) continue;
+      int len = read(client.socket, buffer, kBufferSize);
+      if (len <= 0) {
+        HandleClientDisconnect(client);
+      } else {
+        std::string message(buffer, len);
 
-        }
+        // If the message received cannot be unmarshaled into a valid news
+        // item then terminate connection with its client else process the
+        // news item.
+        common::NewsItem item;
+        if (!common::NewsItem::FromString(message, item))
+          HandleClientDisconnect(client);
+        else
+          send_acks_to.push(&client);
       }
     }
   }
@@ -203,11 +217,10 @@ void Server::HandleClientDisconnect(ClientProxy& client) {
 }
 
 void Server::SendAcksToClient(std::queue<ClientProxy*>& clients_to_ack) {
-    while(clients_to_ack.size()) {
-        ClientProxy* client = clients_to_ack.front();
-        clients_to_ack.pop();
-        if (client->IsConnected())
-            send(client->socket, "ACK", 3, 0);
-    }
+  while (clients_to_ack.size()) {
+    ClientProxy* client = clients_to_ack.front();
+    clients_to_ack.pop();
+    if (client->IsConnected()) send(client->socket, "ACK", 3, 0);
+  }
 }
 }  // namespace server
