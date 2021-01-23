@@ -23,8 +23,7 @@ class ClientManagerThread : public std::thread {
   // Adds a new client that is managed by this thread.
   void AddClient(const ClientProxy& client);
 
-  // Main run loop that listes to client fds for changes. This is run on
-  // a separate thread.
+  // Main run loop for this thread that listens to client fds for changes. 
   void RunLoop();
 
   // Stop the run loop and make the thread joinable.
