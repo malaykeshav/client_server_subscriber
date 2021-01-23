@@ -70,9 +70,9 @@ void Server::StartListening() {
   InitializeReaderThread();
 
   fd_set fdset;
-  FD_ZERO(&fdset);
-  FD_SET(socket_, &fdset);
   while (true) {
+    FD_ZERO(&fdset);
+    FD_SET(socket_, &fdset);
     // Listen for client connections.
     int activity = select(socket_ + 1, &fdset, nullptr, nullptr, nullptr);
 
