@@ -1,6 +1,7 @@
 #ifndef SERVER_SUBSCRIBER_H_
 #define SERVER_SUBSCRIBER_H_
 
+#include <mutex>
 #include <queue>
 #include <string>
 #include <unordered_set>
@@ -11,7 +12,7 @@ namespace server {
 
 class Subscriber {
  public:
-  Subscriber(unsigned long long id);
+  Subscriber(unsigned long long id, const std::string& out_folder);
   ~Subscriber() = default;
 
   // Add |interest| to list of things this subscriber is interested in.
@@ -33,13 +34,19 @@ class Subscriber {
  private:
   unsigned long long id_ = -1;
 
+  // Path to out folder where the subscriber will write to disk.
+  const std::string out_folder_;
+
   // The intersts of this subscriber.
   std::unordered_set<std::string> interests_;
 
+  // A mutex to read the queue with pending items.
+  std::mutex pending_item_mtx_;
+
   // The news items waiting to be flushed to the subscriber.
-  std::priority_queue<common::NewsItem, std::vector<common::NewsItem>,
-                      common::NewsItem::OrderByPriority>
-      pending_items_;
+  typedef std::priority_queue<common::NewsItem, std::vector<common::NewsItem>,
+                      common::NewsItem::OrderByPriority> NewsItemPriorityQueue;
+  NewsItemPriorityQueue pending_items_;
 };
 
 }  // namespace server

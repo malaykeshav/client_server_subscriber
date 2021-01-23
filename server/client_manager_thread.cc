@@ -74,6 +74,7 @@ void ClientManagerThread::RunLoop() {
     if (interval > kPushItemThresholdMilliSec) {
         delegate_->PushItemsToSubscribers(received_items_);
         received_items_.clear();
+        begin = current;
     }
 
     // Send "ACK" to clients so they send the next message.

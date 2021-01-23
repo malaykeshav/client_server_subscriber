@@ -10,20 +10,30 @@
 #include <memory>
 #include <mutex>
 #include <queue>
+#include <vector>
 
 #include "../common/news_item.h"
+#include "client_manager_thread.h"
+#include "subscriber.h"
+#include "subscriber_writer_thread.h"
 
 namespace server {
 namespace {
 constexpr int kListenPendingQueue = 3;
+constexpr int kSubscriberFlushIntervalMs = 100;
 }  // namespace
 
-Server::Server(const std::string& config_file_name)
+Server::Server(const std::string& config_file_name,
+               const std::string& subscriber_out_path)
     : config_file_reader_(config_file_name) {
-  InitializeSubscriberConfig();
+  InitializeSubscriberConfig(subscriber_out_path);
+  InitializeWriterThread();
 }
 
-Server::~Server() { TerminateReaderThread(); }
+Server::~Server() {
+  TerminateReaderThread();
+  TerminateWriterThread();
+}
 
 bool Server::OpenSocket(int port) {
   int opt = 1;
@@ -98,18 +108,19 @@ void Server::StartListening() {
 
 void Server::PushItemsToSubscribers(
     const std::vector<common::NewsItem>& items) {
-    for (auto& it : subscribers_)
-        it.second->PushNewsItems(items);
+  for (auto& it : subscribers_) it.second->PushNewsItems(items);
 }
 
-void Server::InitializeSubscriberConfig() {
+void Server::InitializeSubscriberConfig(
+    const std::string& subscriber_out_path) {
   common::SubscriberItem item;
 
   while (config_file_reader_.GetNextLineAsSubscriberItem(item)) {
     auto it = subscribers_.find(item.subscriber_id);
     if (it == subscribers_.end()) {
-      subscribers_.insert({item.subscriber_id,
-                           std::make_unique<Subscriber>(item.subscriber_id)});
+      subscribers_.insert(
+          {item.subscriber_id, std::make_unique<Subscriber>(
+                                   item.subscriber_id, subscriber_out_path)});
     }
     auto& subscriber = subscribers_.at(item.subscriber_id);
     subscriber->AddInterest(item.category);
@@ -117,6 +128,7 @@ void Server::InitializeSubscriberConfig() {
 }
 
 void Server::TerminateReaderThread() {
+  if (!reader_thread_) return;
   reader_thread_->Stop();
   reader_thread_->join();
   reader_thread_.reset(nullptr);
@@ -131,6 +143,21 @@ void Server::HandleClientConnect(ClientProxy client) {
 void Server::InitializeReaderThread() {
   // Initialize a thread that will read responses from clients.
   reader_thread_ = std::make_unique<ClientManagerThread>(this);
+}
+
+void Server::InitializeWriterThread() {
+  std::vector<Subscriber*> subscribers;
+  for (const auto& it : subscribers_) subscribers.push_back(it.second.get());
+
+  subscriber_writer_thread_ = std::make_unique<SubscriberWriterThread>(
+      subscribers, kSubscriberFlushIntervalMs);
+}
+
+void Server::TerminateWriterThread() {
+  if (!subscriber_writer_thread_) return;
+  subscriber_writer_thread_->Stop();
+  subscriber_writer_thread_->join();
+  subscriber_writer_thread_.reset(nullptr);
 }
 
 }  // namespace server

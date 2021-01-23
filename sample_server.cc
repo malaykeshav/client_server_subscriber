@@ -11,8 +11,9 @@ int main(int argc, char *argv[]) {
     return 0;
   }
   std::string config_file_name = argv[1];
+  std::string subscriber_out_folder = argv[2];
 
-  server::Server server(config_file_name);
+  server::Server server(config_file_name, subscriber_out_folder);
   bool result = server.OpenSocket(9211);
   if (!result) return 0;
   server.StartListening();

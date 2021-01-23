@@ -10,15 +10,18 @@
 #include <vector>
 
 #include "../common/file_reader.h"
-#include "client_manager_thread.h"
 #include "client_proxy.h"
 #include "server_subscriber_delegate.h"
-#include "subscriber.h"
+
 
 namespace server {
+class ClientManagerThread;
+class Subscriber;
+class SubscriberWriterThread;
 class Server : public ServerSubscriberDelegate {
  public:
-  Server(const std::string& config_file_name);
+  explicit Server(const std::string& config_file_name,
+                  const std::string& subscriber_out_folder);
   ~Server();
 
   // Opens a socket to listen on. Returns true on success.
@@ -39,7 +42,12 @@ class Server : public ServerSubscriberDelegate {
 
  private:
   // Reads the server config file to initialize the hash map of subscriber.
-  void InitializeSubscriberConfig();
+  void InitializeSubscriberConfig(const std::string& subscriber_out_path);
+
+  // Initializes the writer thread to manage flushing item to disk for each
+  // subscriber.
+  void InitializeWriterThread();
+  void TerminateWriterThread();
 
   void HandleClientConnect(ClientProxy client);
 
@@ -60,6 +68,10 @@ class Server : public ServerSubscriberDelegate {
   // This coule be improved by haveing a pool of threads that each listen
   // to a subset of clients.
   std::unique_ptr<ClientManagerThread> reader_thread_;
+
+  // A thread responsible for managing the flush of news items pending for each
+  // subscriber.
+  std::unique_ptr<SubscriberWriterThread> subscriber_writer_thread_;
 };
 
 }  // namespace server

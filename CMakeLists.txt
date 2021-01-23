@@ -22,6 +22,7 @@ add_executable(Sample_Server
                server/client_manager_thread.cc
                server/server.cc 
                server/subscriber.cc 
+               server/subscriber_writer_thread.cc
                common/file_reader.cc 
                common/news_item.cc)
 

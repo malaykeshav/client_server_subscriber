@@ -8,6 +8,7 @@ class NewsItem;
 }
 
 namespace server {
+class Subscriber;
 class ServerSubscriberDelegate {
  public:
   // Calling this method pushes the list of items to the subscribers managed by
