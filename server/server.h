@@ -6,11 +6,11 @@
 #include <memory>
 #include <mutex>
 #include <queue>
-#include <thread>
 #include <unordered_map>
 #include <vector>
 
 #include "../common/file_reader.h"
+#include "client_manager_thread.h"
 #include "client_proxy.h"
 #include "subscriber.h"
 
@@ -36,21 +36,12 @@ class Server {
   // Reads the server config file to initialize the hash map of subscriber.
   void InitializeSubscriberConfig();
 
+  void HandleClientConnect(ClientProxy client);
+
   // Initializes the thread that is responsible for reading the incoming
   // messages from the client.
   void InitializeReaderThread();
   void TerminateReaderThread();
-
-  // An infinite loop that listes to client fds for changes. This is run on
-  // a separate thread.
-  void ReadFromClientLoop();
-
-  void HandleNewClient(ClientProxy client);
-  void HandleClientDisconnect(ClientProxy& client);
-
-  // Sends an ACK to the list of clients in |clients_to_ack|. These clients
-  // have sent a message and are waiting on ACK to send the next one.
-  void SendAcksToClient(std::queue<ClientProxy*>& clients_to_ack);
 
   common::FileReader config_file_reader_;
 
@@ -60,12 +51,10 @@ class Server {
   int socket_ = 0;
   sockaddr_in address_;
 
-  std::mutex clients_mtx_;
-  std::vector<ClientProxy> clients_;
-  std::queue<ClientProxy> clients_wait_queue_;
-
-  std::unique_ptr<std::thread> reader_thread_;
-  bool listening_ = false;
+  // POSSIBLE OPTIMIZATION
+  // This coule be improved by haveing a pool of threads that each listen
+  // to a subset of clients.
+  std::unique_ptr<ClientManagerThread> reader_thread_;
 };
 
 }  // namespace server

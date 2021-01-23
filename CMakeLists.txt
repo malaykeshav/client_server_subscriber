@@ -19,6 +19,7 @@ add_definitions(
 
 add_executable(Sample_Server 
                sample_server.cc 
+               server/client_manager_thread.cc
                server/server.cc 
                server/subscriber.cc 
                common/file_reader.cc 
