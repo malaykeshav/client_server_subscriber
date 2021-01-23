@@ -19,10 +19,13 @@ add_definitions(
 
 add_executable(Sample_Server
         sample_server.cc
-        server/server.cc)
+        server/server.cc
+        common/news_item.cc)
 
 add_executable(Sample_Client
         sample_client.cc
-        client/client.cc)
+        client/client.cc
+        client/file_reader.cc
+        common/news_item.cc)
 
 target_link_libraries (Sample_Server ${CMAKE_THREAD_LIBS_INIT})

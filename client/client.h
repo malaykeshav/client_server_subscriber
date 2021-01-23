@@ -1,15 +1,16 @@
 #ifndef CLIENT_CLIENT_H_
 #define CLIENT_CLIENT_H_
 
-#include <netinet/in.h>
+#include "file_reader.h"
 
+#include <netinet/in.h>
 #include <string>
 
 namespace client {
 
 class Client {
  public:
-  Client() = default;
+  Client(const std::string& input_file_name);
   ~Client() = default;
 
   // Connects the client to a server on specified ip address
@@ -38,6 +39,7 @@ class Client {
   std::string ip_address_;
   char buffer_[1024];
   bool should_disconnect_ = false;
+  FileReader file_reader_;
 };
 
 }  // namespace client

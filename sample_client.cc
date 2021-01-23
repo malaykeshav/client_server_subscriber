@@ -6,7 +6,12 @@
 #include "client/client.h"
 
 int main(int argc, char *argv[]) {
-    client::Client client;
+    if (!argc) {
+        std::cerr << "Need input file to start client." << std::endl;
+        return 0;
+    }
+    std::string file_name = argv[1];
+    client::Client client(file_name);
     bool result = client.ConnectToServer("127.0.0.1", 9211);
     if (!result)
         return 0;

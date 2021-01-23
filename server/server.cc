@@ -1,5 +1,7 @@
 #include "server.h"
 
+#include "../common/news_item.h"
+
 #include <arpa/inet.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,6 +11,7 @@
 #include <iostream>
 #include <memory>
 #include <mutex>
+#include <queue>
 #include <thread>
 
 namespace server {
@@ -118,9 +121,7 @@ void Server::HandleNewClient(ClientProxy client) {
     std::unique_lock<std::mutex> lck(clients_mtx_);
     clients_wait_queue_.push(client);
   }
-
-  std::string hello = "Server: Connected to server";
-  send(client.socket, hello.c_str(), hello.size(), 0);
+  send(client.socket, "ACK", 3, 0);
 }
 
 void Server::InitializeReaderThread() {
@@ -141,7 +142,10 @@ void Server::ReadFromClientLoop() {
 
   char buffer[kBufferSize] = {0};
 
+  std::queue<ClientProxy*> send_acks_to;
+
   while (listening_) {
+    SendAcksToClient(send_acks_to);
     int max_socket = 0;
     {
       // Check if any new client has connected since last iteration.
@@ -154,13 +158,12 @@ void Server::ReadFromClientLoop() {
         std::cout << "Reader thread is listening to new client: "
                   << client.socket << std::endl;
       }
-
-      FD_ZERO(&fd_read_set);
-      for (const auto& client : clients_) {
-        if (!client.IsConnected()) continue;
-        FD_SET(client.socket, &fd_read_set);
-        max_socket = std::max(max_socket, client.socket);
-      }
+    }
+    FD_ZERO(&fd_read_set);
+    for (const auto& client : clients_) {
+      if (!client.IsConnected()) continue;
+      FD_SET(client.socket, &fd_read_set);
+      max_socket = std::max(max_socket, client.socket);
     }
     int activity =
         select(max_socket + 1, &fd_read_set, nullptr, nullptr, &timeout);
@@ -174,7 +177,15 @@ void Server::ReadFromClientLoop() {
           HandleClientDisconnect(client);
         } else {
           std::string message(buffer, len);
-          std::cout << "Message from client: " << message << std::endl;
+        
+          // If the message received cannot be marshaled into a valid news item
+          // terminate connection with client.
+          common::NewsItem item;
+          if (!common::NewsItem::FromString(message, item))
+            HandleClientDisconnect(client);
+          else 
+              send_acks_to.push(&client);
+
         }
       }
     }
@@ -191,4 +202,12 @@ void Server::HandleClientDisconnect(ClientProxy& client) {
   client.socket = 0;
 }
 
+void Server::SendAcksToClient(std::queue<ClientProxy*>& clients_to_ack) {
+    while(clients_to_ack.size()) {
+        ClientProxy* client = clients_to_ack.front();
+        clients_to_ack.pop();
+        if (client->IsConnected())
+            send(client->socket, "ACK", 3, 0);
+    }
+}
 }  // namespace server

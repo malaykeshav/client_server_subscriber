@@ -15,6 +15,9 @@ namespace {
 constexpr int kConnectionTimeOutSec = 10;
 }  // namespace
 
+Client::Client(const std::string& input_file_name)
+    : file_reader_(input_file_name) {}
+
 bool Client::ConnectToServer(const std::string& ip_address, int port) {
   socket_ = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -58,6 +61,14 @@ void Client::RunLoop() {
 
       if (FD_ISSET(socket_, &fd_read_set)) {
         std::string message = ReadFromSocket();
+        
+        // Clients only send the next line of their news item if their previous
+        // message is ACKed.
+        if (message != "ACK") {
+          std::cout << "Server sent non ACK message." << std::endl;
+          close(socket_);
+          return;
+        }
 
         // Check to see if the socket is still connected.
         if (should_disconnect_) {
@@ -65,8 +76,14 @@ void Client::RunLoop() {
           close(socket_);
           return;
         }
-        std::cout << message << std::endl;
-        SendToServer("Message sent from client");
+         
+        common::NewsItem item;
+        if (!file_reader_.GetNextLine(item)) {
+          std::cout << "No more data to read from input file." << std::endl;
+          close(socket_);
+          return;
+        }
+        SendToServer(item.ToString());
       }
     }
   }

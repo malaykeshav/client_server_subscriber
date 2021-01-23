@@ -36,6 +36,7 @@ class Server {
   void TerminateReaderThread();
   void ReadFromClientLoop();
   void HandleClientDisconnect(ClientProxy& client);
+  void SendAcksToClient(std::queue<ClientProxy*>& clients_to_ack);
 
   int socket_ = 0;
   sockaddr_in address_;
